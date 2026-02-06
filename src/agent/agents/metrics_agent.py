@@ -1,5 +1,3 @@
-import os
-import logging
 import json
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
@@ -10,7 +8,7 @@ class MetricsAgent:
     def __init__(self):
         self.llm = ChatGroq(
             temperature=0, 
-            model_name="openai/gpt-oss-20b",
+            model_name="llama3-70b-8192",
             api_key=os.getenv("GROQ_API_KEY")
         )
 
