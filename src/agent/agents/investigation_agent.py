@@ -4,6 +4,8 @@ import json
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 
+from secrets_manager import get_secret
+
 logger = logging.getLogger()
 
 
@@ -18,7 +20,7 @@ class InvestigationAgent:
         self.llm = ChatGroq(
             temperature=0,
             model_name="openai/gpt-oss-20b",
-            api_key=os.getenv("GROQ_API_KEY")
+            api_key=get_secret()
         )
 
     def synthesize(self, log_analysis: dict, metrics_analysis: dict, deployment_analysis: dict) -> dict:
