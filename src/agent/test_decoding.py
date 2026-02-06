@@ -35,6 +35,8 @@ def test_decoding():
     print("Invoking handler with mocked CloudWatch event...")
     response = app.handler(event, None)
     print(f"Response: {response}")
+    with open(r"C:\Users\hp\Documents\repos\autonomous-incident-commander\output\investigation.json", "w") as f:
+        json.dump(response, f, indent=2)
 
 if __name__ == "__main__":
     test_decoding()

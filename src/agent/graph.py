@@ -3,6 +3,7 @@ from langgraph.graph import StateGraph, END
 from agents.log_agent import LogAgent
 from agents.metrics_agent import MetricsAgent
 from agents.deploy_agent import DeployAgent
+from agents.investigation_agent import InvestigationAgent
 
 # Define the State
 class AgentState(TypedDict):
@@ -16,6 +17,7 @@ class AgentState(TypedDict):
 log_agent = LogAgent()
 metrics_agent = MetricsAgent()
 deploy_agent = DeployAgent()
+investigation_agent = InvestigationAgent()
 
 # Define Nodes
 def run_log_agent(state: AgentState) -> Dict[str, Any]:
@@ -30,28 +32,23 @@ def run_deploy_agent(state: AgentState) -> Dict[str, Any]:
     # Deploy agent creates its own context from files, doesn't strictly need payload but we keep signature consistent
     return {"deployment_analysis": deploy_agent.analyze()}
 
-def reconcile_findings(state: AgentState) -> Dict[str, Any]:
+def run_investigation_agent(state: AgentState) -> Dict[str, Any]:
+    """
+    The Investigation Agent synthesizes findings from all specialized agents
+    and produces a comprehensive final investigation report.
+    """
     log_analysis = state.get("log_analysis", {})
     metrics_analysis = state.get("metrics_analysis", {})
     deployment_analysis = state.get("deployment_analysis", {})
     
-    # Synthesis Logic (replicated from original CommanderAgent)
-    diagnosis = "Unknown Issue"
-    if "out of memory" in log_analysis.get("issues", []) or "MemoryUsed" in metrics_analysis.get("alerts", []):
-            diagnosis = "Potential Memory Exhaustion"
-            if "memory_size" in deployment_analysis.get("changes", {}):
-                diagnosis += " likely caused by recent configuration change (memory reduction)."
+    # Use the LLM-powered Investigation Agent for intelligent synthesis
+    final_report = investigation_agent.synthesize(
+        log_analysis=log_analysis,
+        metrics_analysis=metrics_analysis,
+        deployment_analysis=deployment_analysis
+    )
     
-    final_diagnosis = {
-        "status": "Investigation Complete",
-        "diagnosis": diagnosis,
-        "details": {
-            "log_analysis": log_analysis,
-            "metrics_analysis": metrics_analysis,
-            "deployment_analysis": deployment_analysis
-        }
-    }
-    return {"final_diagnosis": final_diagnosis}
+    return {"final_diagnosis": final_report}
 
 # Build the Graph
 workflow = StateGraph(AgentState)
@@ -60,37 +57,28 @@ workflow = StateGraph(AgentState)
 workflow.add_node("log_agent", run_log_agent)
 workflow.add_node("metrics_agent", run_metrics_agent)
 workflow.add_node("deploy_agent", run_deploy_agent)
-workflow.add_node("reconciler", reconcile_findings)
+workflow.add_node("investigation_agent", run_investigation_agent)
 
-# Set Entry Point
-# We branch to all 3 agents immediately. 
-# Note: LangGraph doesn't have a "broadcast" primitive exactly like this in valid start nodes,
-# but we can have a dummy start node that edges to all three, or just set entry point to one and parallelize.
-# OR cleaner: Use a fan-out node.
-# Let's use a dummy 'start' node that just passes state through to be explicit, but actually
-# we can just add edges from a virtual start.
-# For true parallel execution in the graph structure:
-# We can make them all available from start.
-workflow.set_entry_point("log_agent") # This would be sequential if we just chain.
-# To run parallel, we need a common starting node that branches.
-
+# Set Entry Point with fan-out pattern for parallel execution
 def start_node(state: AgentState):
     return state
 
 workflow.add_node("start", start_node)
 workflow.set_entry_point("start")
 
+# Fan-out: Start branches to all 3 specialized agents in parallel
 workflow.add_edge("start", "log_agent")
 workflow.add_edge("start", "metrics_agent")
 workflow.add_edge("start", "deploy_agent")
 
-# All agents point to reconciler
-workflow.add_edge("log_agent", "reconciler")
-workflow.add_edge("metrics_agent", "reconciler")
-workflow.add_edge("deploy_agent", "reconciler")
+# Fan-in: All specialized agents converge to the Investigation Agent
+workflow.add_edge("log_agent", "investigation_agent")
+workflow.add_edge("metrics_agent", "investigation_agent")
+workflow.add_edge("deploy_agent", "investigation_agent")
 
-# Reconciler ends
-workflow.add_edge("reconciler", END)
+# Investigation Agent produces final report and ends
+workflow.add_edge("investigation_agent", END)
 
 # Compile
 app = workflow.compile()
+
