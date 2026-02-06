@@ -1,46 +1,55 @@
-import os
-import logging
 import json
-from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
+from groq import Groq
 
-logger = logging.getLogger()
+def classify_cloudwatch_logs_groq(log_json):
 
-class MetricsAgent:
-    def __init__(self):
-        self.llm = ChatGroq(
-            temperature=0, 
-            model_name="llama3-70b-8192",
-            api_key=os.getenv("GROQ_API_KEY")
+    client = Groq()  # uses GROQ_API_KEY
+    results = []
+
+    system_prompt = (
+        "You are an expert SRE log classification agent.\n"
+        "For the given CloudWatch log message, classify it into:\n"
+        "- severity: INFO, WARNING, ERROR, CRITICAL\n"
+        "- category: APPLICATION, INFRA, SECURITY, BUSINESS, UNKNOWN\n"
+        "- action_required: IGNORE, MONITOR, INVESTIGATE, IMMEDIATE_ACTION\n"
+        "- confidence: number between 0.0 and 1.0\n"
+        "- reason: short operational explanation\n\n"
+        "Rules:\n"
+        "- Respond ONLY with valid JSON\n"
+        "- No markdown\n"
+        "- No extra text\n"
+        "- Be deterministic and concise"
+    )
+
+    for log in log_json.get("logs", []):
+        user_prompt = f'CloudWatch log message:\n"{log.get("message", "")}"'
+
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            temperature=0.0,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ]
         )
 
-    def analyze(self, log_payload):
-        logger.info("Metrics Agent: Fetching system metrics and analyzing with LLM...")
-        
-        # Mocking the data fetch still, but using LLM to interpret it
-        mock_metrics = {
-            "cpu_utilization": "10%",
-            "memory_utilization": "95%",
-            "disk_io": "normal"
-        }
-        
-        prompt = ChatPromptTemplate.from_messages([
-            ("system", "You are an expert Systems Engineer. Analyze the provided system metrics and return a JSON object with 'status' (healthy/degraded/critical) and 'alerts' (list of specific concerns)."),
-            ("human", "{metrics}")
-        ])
-        
-        chain = prompt | self.llm
-        
+        raw = response.choices[0].message.content
+
         try:
-            response = chain.invoke({"metrics": json.dumps(mock_metrics)})
-             # Naive parsing
-            content = response.content
-            if "```json" in content:
-                content = content.split("```json")[1].split("```")[0]
-            elif "```" in content:
-                content = content.split("```")[1].split("```")[0]
-                
-            return json.loads(content)
-        except Exception as e:
-            logger.error(f"LLM Analysis failed: {e}")
-            return {"error": str(e), "alerts": ["High MemoryUsed detected (Fallback)"]}
+            classification = json.loads(raw)
+        except Exception:
+            classification = {
+                "severity": "UNKNOWN",
+                "category": "UNKNOWN",
+                "action_required": "INVESTIGATE",
+                "confidence": 0.0,
+                "reason": "Failed to parse Groq response"
+            }
+
+        results.append({
+            "timestamp": log.get("timestamp"),
+            "message": log.get("message"),
+            "classification": classification
+        })
+
+    return results
