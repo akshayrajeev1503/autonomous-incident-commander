@@ -1,0 +1,6 @@
+[2026-02-06 14:00:00] Starting deployment...
+[2026-02-06 14:00:05] Terraform plan: 0 to add, 1 to change, 0 to destroy.
+[2026-02-06 14:00:06] Change: aws_lambda_function.example memory_size forces replacement NO. Updated in-place.
+[2026-02-06 14:00:06] Change: memory_size from 512 to 128.
+[2026-02-06 14:00:10] Apply complete! Resources: 0 added, 1 changed, 0 destroyed.
+[2026-02-06 14:00:15] Deployment verification passed. Function active.
