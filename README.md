@@ -19,7 +19,7 @@ When production breaks at 2 AM:
 1. **Detects** the incident via CloudWatch log subscription
 2. **Investigates** using specialized AI agents running in parallel
 3. **Synthesizes** findings into a root cause analysis
-4. **Reports** via a live dashboard you can access anytime
+4. **Reports** via an email using AWS SES (Not Implemented yet)
 
 ---
 
@@ -84,5 +84,6 @@ open output/report.html
 ---
 
 ## 📄 License
+
 
 MIT
